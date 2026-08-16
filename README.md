@@ -18,6 +18,22 @@ transfers anything.
 > pre-filter only — it never overrides the vote, and a PASS here does not
 > mint anything.**
 
+## Contents
+
+- [Files](#files)
+- [Run it](#run-it)
+- [Foken Invoice schema](#foken-invoice-schema)
+- [Validation & verdict logic](#validation--verdict-logic-in-precedence-order)
+- [The net-utility formula](#the-net-utility-formula)
+- [Reviewer set & quorum](#reviewer-set--quorum-the-50-rule)
+- [Off-chain tally (`tally.py`)](#off-chain-tally-tallypy)
+- [Pending owner params](#pending-owner-params-not-hardcoded)
+- [Tests](#tests)
+- [Design choices & resolved ambiguities](#design-choices--resolved-ambiguities)
+- [Non-goals](#non-goals)
+- [License](#license)
+- [Further reading](#further-reading)
+
 ---
 
 ## Files
@@ -331,3 +347,30 @@ Test suites:
 - No blockchain, no token economics, no pricing, no vesting, no minting.
 - No secret material anywhere — this gate reads only public invoice data.
 - Not deployed, not git-homed (the owner does that separately).
+
+## License
+
+MIT — see [LICENSE](LICENSE). The invoice's `ipAssignment.license` field
+follows the same policy (`MIT-or-none`): contributors assign their IP
+irrevocably, and the tooling that judges them stays free.
+
+## Further reading
+
+- **The Foken governance design** — the on-chain half (AttestationVerifier,
+  mintFromConsensus) this prototype pairs with.
+- David Edgerton, *The Shock of the Old: Technology and Global History since
+  1900* (2006) — use-centric value vs. innovation-centric attention: the
+  `maintenanceDebtHours` term is exactly the use-centric lens.
+- Elinor Ostrom, *Governing the Commons* (1990) — collective governance of
+  shared resources: why the reviewer quorum, not the formula, is the binding
+  decision.
+- Vitalik Buterin, Zoë Hitzig, E. Glen Weyl, *A Flexible Design for Funding
+  Public Goods* (2019) — quadratic funding as the boundary case this gate
+  deliberately stops short of.
+- Mike Masnick, *Protocols, Not Platforms* (2019) — why a pre-filter plus a
+  human vote, with no platform in the middle.
+- *Recency as Salience* and *A Mező és a Tömeg* (Vének Tanácsa, 2026) — the
+  proxy critique this gate is built against: a scalar proxy turns pathological
+  when a relational system delegates its continuation to it. Foken's refusal
+  to price anything is the same refusal, at the governance layer.
+  ([Sovereign Library](https://pocoo.vaked.dev/demos/book/))

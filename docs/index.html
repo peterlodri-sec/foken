@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Foken — proof-of-contribution valuation gate</title>
+<meta name="description" content="Foken: a coarse, deterministic pre-filter for contribution governance. Invoice schema, net-utility formula, human >50% vote. No blockchain, no tokens, no secrets.">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="index, follow">
+<meta name="ai-content-declaration" content="noai, noimageai">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' stroke='%23ff7a3d' stroke-opacity='0.5' stroke-width='4' fill='none'/><path d='M32 14c5 7 2 10 6 13 3.5 2.6 8 6 8 12 0 7-5.5 11-14 11s-14-4-14-11c0-6 4.5-9.4 8-12 4-3 1-6 6-13Z' fill='%23ff7a3d' opacity='0.85'/></svg>">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #080406; color: #c8b8a8;
+    font: 16px/1.75 Georgia, "Times New Roman", serif;
+  }
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  header { padding: 2.5rem 0 1.5rem; border-bottom: 1px solid #2a1d12; }
+  .brand { font: 600 1rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.35em; color: #ff7a3d; }
+  h1 { font: 400 2.6rem/1.15 Georgia, serif; color: #f5e6d8; margin: 1rem 0 0.5rem; }
+  h1 em { color: #e6b566; font-style: italic; }
+  .lede { font-size: 1.15rem; color: #b89a7a; max-width: 38rem; }
+  h2 {
+    font: 400 1.35rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #e6b566; letter-spacing: 0.08em; margin: 3rem 0 1rem; padding-top: 1rem;
+    border-top: 1px solid #2a1d12;
+  }
+  h3 { font: 600 1.02rem/1.4 ui-monospace, monospace; color: #ffb27a; letter-spacing: 0.05em; margin: 1.8rem 0 0.6rem; }
+  p { margin: 0.7rem 0; }
+  a { color: #ffb27a; text-decoration: none; border-bottom: 1px solid #5a3d28; }
+  a:hover { color: #ffd9b0; border-bottom-color: #ffb27a; }
+  code {
+    font: 0.85em/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: #140d08; border: 1px solid #2a1d12; border-radius: 4px; padding: 0.1em 0.4em; color: #e6b566;
+  }
+  pre {
+    background: #0d0805; border: 1px solid #2a1d12; border-radius: 8px;
+    padding: 1rem 1.25rem; overflow-x: auto;
+    font: 0.82rem/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; color: #cbb89f;
+  }
+  pre code { background: none; border: 0; padding: 0; color: inherit; }
+  table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #221610; vertical-align: top; }
+  th { font: 600 0.75rem/1.4 ui-monospace, monospace; letter-spacing: 0.12em; color: #8a6a4a; text-transform: uppercase; }
+  .verdicts { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.5rem 0; }
+  .verdict { flex: 1 1 9rem; border: 1px solid #2a1d12; border-radius: 10px; padding: 1rem 1.1rem; background: linear-gradient(180deg, #120b07, #0d0805); }
+  .verdict b { font: 600 0.9rem/1.4 ui-monospace, monospace; letter-spacing: 0.2em; }
+  .verdict p { margin: 0.4rem 0 0; font-size: 0.88rem; color: #9c8a74; }
+  .pass b { color: #7fd6a8; } .fail b { color: #e07a6a; } .review b { color: #e6b566; }
+  .formula {
+    text-align: center; font: 1.05rem/1.8 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #e6b566; background: #0d0805; border: 1px solid #2a1d12; border-radius: 10px;
+    padding: 1.2rem; margin: 1.2rem 0;
+  }
+  .note { border-left: 3px solid #e6b566; background: #120c07; padding: 0.7rem 1rem; border-radius: 0 8px 8px 0; font-size: 0.95rem; }
+  .note b { color: #e6b566; }
+  footer {
+    margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid #2a1d12;
+    font: 0.72rem/1.9 ui-monospace, monospace; color: #6a5a4a; text-align: center;
+  }
+  footer a { color: #8a6a4a; border: 0; }
+  footer a:hover { color: #ffb27a; }
+  .lane { letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">FOKEN</div>
+  <h1>Proof-of-contribution <em>valuation gate</em></h1>
+  <p class="lede">A coarse, deterministic pre-filter in front of the binding governance decision. An invoice goes in; a verdict comes out — <code>PASS</code>, <code>FAIL</code>, or <code>REVIEW</code>. Nothing is minted, priced, or transferred here.</p>
+</header>
+
+<p class="note"><b>The binding decision is always the human &gt;50% vote.</b> The formula is a pre-filter only — it never overrides the vote, and a <code>PASS</code> does not mint anything.</p>
+
+<h2>What it is</h2>
+<p>Foken is the <b>off-chain half</b> of the Foken governance design: a verifiable contribution pre-filter, not equity minting. A contributor submits a <b>Foken Invoice</b> — a JSON document describing the work, its provenance, and its IP assignment. The gate validates it against hard gates, applies the <b>net-utility formula</b>, and emits a verdict. There is no blockchain, no token economics, no secrets, and no deployment.</p>
+
+<div class="verdicts">
+  <div class="verdict pass"><b>PASS</b><p>Net utility positive — eligible for the human vote.</p></div>
+  <div class="verdict fail"><b>FAIL</b><p>Malformed, unsigned, unprovenanced, or net-negative. Rejected outright.</p></div>
+  <div class="verdict review"><b>REVIEW</b><p>Fixable by a human: missing numbers, or a valuation that deviates from history.</p></div>
+</div>
+
+<p>Precedence is <code>FAIL &gt; REVIEW &gt; PASS</code> — a net-negative invoice never reaches an extra review round.</p>
+
+<h2>The net-utility formula</h2>
+<div class="formula">net = futureWorkAvoidedHours − (workAddedHours + 1.5 × maintenanceDebtHours)</div>
+<p>The <code>1.5</code> weight reflects that maintenance debt is worse than work added: it recurs. The <code>netUtility</code> inputs are <b>tool-computed</b> — the gate takes them as given and does not re-derive them from a repo.</p>
+
+<h2>Verdict logic, in precedence order</h2>
+<table>
+  <tr><th>Step</th><th>Check</th><th>Result</th></tr>
+  <tr><td>1</td><td>Structure — missing or type-broken required fields</td><td><code>FAIL</code></td></tr>
+  <tr><td>2</td><td>Hard gates — signed <code>IRREVOCABLE ASSIGNMENT</code>, <code>sha256://</code> provenance, valid <code>0x</code> contributor, positive integer self-assessment</td><td><code>FAIL</code></td></tr>
+  <tr><td>3</td><td><code>netUtility</code> present and non-negative</td><td>else <code>REVIEW</code></td></tr>
+  <tr><td>4</td><td>Net-utility formula — <code>net ≤ 0</code></td><td><code>FAIL</code></td></tr>
+  <tr><td>5</td><td>Valuation deviation (&gt;2× median of last 10 history invoices, with <code>--history</code>)</td><td><code>REVIEW</code></td></tr>
+  <tr><td>6</td><td><code>net &gt; 0</code></td><td><code>PASS</code></td></tr>
+</table>
+
+<h2>Run it</h2>
+<pre><code>uv run python gate.py invoice.json          # verdict as one JSON line
+python3 gate.py -                          # '-' reads stdin
+python3 gate.py invoice.json --history history.json
+python3 gate.py invoice.json --human       # pretty table
+
+# reviewer set + off-chain tally
+python3 tally.py --reviewers reviewers.json --votes votes.json
+python3 tally.py --reviewers reviewers.json --votes votes.json \
+  --review-round 2 --min-approvals 4</code></pre>
+<p>Exit codes: <code>0</code> = PASS, <code>1</code> = FAIL, <code>2</code> = REVIEW. Stdlib only — Python 3.11+, no third-party dependencies.</p>
+
+<h2>Reviewer set &amp; quorum</h2>
+<p>Consensus holds when <b>strictly more than half</b> of the reviewer set approves — 3 of 6 is exactly 50% and does <b>not</b> quorum. When k is met, <code>tally.py</code> emits the mint-ready payload matching the on-chain <code>AttestationVerifier.mintFromConsensus</code> input. Signatures are format-checked only; real verification is out of scope for this prototype.</p>
+
+<h2>Files</h2>
+<table>
+  <tr><th>File</th><th>Purpose</th></tr>
+  <tr><td><code>gate.py</code></td><td>CLI + gate logic + reviewer-set model (34-test suite)</td></tr>
+  <tr><td><code>tally.py</code></td><td>Off-chain tally / consensus service</td></tr>
+  <tr><td><code>invoice.schema.json</code></td><td>Formal JSON Schema (draft-07) for the Foken Invoice</td></tr>
+  <tr><td><code>reviewers.json</code></td><td>Example reviewer set (7 distinct <code>0x</code> addresses)</td></tr>
+  <tr><td><code>test_*.py</code></td><td><code>unittest</code> suites for gate, reviewers, tally, schema</td></tr>
+</table>
+
+<p><a href="https://github.com/peterlodri-sec/foken">Repository →</a> · <a href="https://github.com/peterlodri-sec/foken/blob/main/README.md">Full README →</a></p>
+
+<footer>
+  <div class="lane">the constellation · lovetta lane</div>
+  <div>
+    <a href="https://bonfire.vaked.dev/">bonfire</a> ·
+    <a href="https://art.vaked.dev/">art</a> ·
+    <a href="https://music.vaked.dev/">music</a> ·
+    <a href="https://pocoo.vaked.dev/">pocoo</a> ·
+    <a href="https://proposal.vaked.dev/">proposal</a> ·
+    <a href="https://store.vaked.dev/">store</a> ·
+    <a href="https://axiomquant.org/">axiomquant</a> ·
+    <a href="https://github.com/sponsors/peterlodri-sec">sponsor</a>
+  </div>
+  <div style="margin-top:0.5rem">mért ⇏ értékes · a binding decision is always the human vote · foken · v1</div>
+  <div style="margin-top:0.75rem">the constellation · 0 + 1 · fine touch from within · vaked.dev</div>
+</footer>
+
+</div>
+</body>
+</html>
