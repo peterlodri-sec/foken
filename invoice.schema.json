@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://foken.example/invoice.schema.json",
+  "title": "Foken Invoice",
+  "description": "Formal contract for the Foken Invoice document consumed by gate.py. Field names, required-ness, and types match what gate.py validates (see gate.py REQUIRED_TOP / REQUIRED_NESTED / hard_fail_reason). Two deliberate differences, documented in README.md: ipAssignment.statement and ipAssignment.signature ARE required here (an invoice without them can never pass the IP hard gate), and netUtility is NOT required at the top level (a missing netUtility is a REVIEW in gate.py, never a FAIL) — but when present it must carry all three non-negative numeric fields.",
+  "type": "object",
+  "required": [
+    "invoiceId",
+    "version",
+    "contributor",
+    "work",
+    "artifact",
+    "valuation",
+    "ipAssignment",
+    "dedup"
+  ],
+  "properties": {
+    "invoiceId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Any non-empty string is accepted by the gate (not uuid-validated)."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Invoice format version; currently 1."
+    },
+    "contributor": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "0x followed by exactly 40 hex chars."
+    },
+    "work": {
+      "type": "object",
+      "required": ["title", "description", "repo", "commit"],
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "repo": { "type": "string" },
+        "commit": { "type": "string" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["provenanceHash", "artifactUri"],
+      "properties": {
+        "provenanceHash": {
+          "type": "string",
+          "pattern": "^sha256://",
+          "description": "Must start with sha256://."
+        },
+        "artifactUri": {
+          "type": "string",
+          "description": "e.g. ipfs://..."
+        }
+      }
+    },
+    "valuation": {
+      "type": "object",
+      "required": ["selfAssessedFokens", "basis", "rationale", "evidence"],
+      "properties": {
+        "selfAssessedFokens": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Positive integer. Floats and booleans rejected (same as gate.py)."
+        },
+        "basis": {
+          "type": "string",
+          "description": "e.g. USD. Not gated."
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri" },
+          "description": "List of URLs. format is advisory (non-assertive in most validators)."
+        }
+      }
+    },
+    "ipAssignment": {
+      "type": "object",
+      "required": ["statement", "license", "signedAt", "signature"],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "pattern": "IRREVOCABLE ASSIGNMENT",
+          "description": "Must contain IRREVOCABLE ASSIGNMENT (substring match, as in gate.py)."
+        },
+        "license": {
+          "type": "string",
+          "description": "MIT or none, per policy. Not gated."
+        },
+        "signedAt": {
+          "type": "string",
+          "description": "Not date-validated (date-only strings accepted)."
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]+$",
+          "description": "0x-prefixed hex, any length (gate.py enforces no fixed length)."
+        }
+      }
+    },
+    "netUtility": {
+      "type": "object",
+      "description": "Tool-computed inputs. Optional at the top level: a missing netUtility is a REVIEW (human can fix it), never a FAIL. When present, all three fields are required and non-negative.",
+      "required": ["futureWorkAvoidedHours", "workAddedHours", "maintenanceDebtHours"],
+      "properties": {
+        "futureWorkAvoidedHours": { "type": "number", "minimum": 0 },
+        "workAddedHours": { "type": "number", "minimum": 0 },
+        "maintenanceDebtHours": { "type": "number", "minimum": 0 }
+      }
+    },
+    "dedup": {
+      "type": "object",
+      "required": ["claimedNovelty", "relatedInvoiceIds"],
+      "properties": {
+        "claimedNovelty": { "type": "string" },
+        "relatedInvoiceIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

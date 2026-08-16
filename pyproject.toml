@@ -1,0 +1,10 @@
+[project]
+name = "foken"
+version = "0.1.0"
+description = "Foken proof-of-contribution valuation gate — off-chain pre-filter (prototype)"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+# Non-package project: `uv run python gate.py` works with zero build steps.
+package = false
