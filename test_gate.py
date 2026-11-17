@@ -77,7 +77,48 @@ class TestEvaluate(unittest.TestCase):
     def test_result_dict_shape(self):
         result = gate.evaluate(base_invoice())
         self.assertEqual(set(result), {"invoiceId", "verdict", "reason",
-                                       "netUtility"})
+                                       "netUtility", "netUtilityMillis"})
+
+    def test_net_utility_millis_is_an_integer(self):
+        result = gate.evaluate(base_invoice())
+        millis = result["netUtilityMillis"]
+        self.assertIsInstance(millis, int)
+        self.assertNotIsInstance(millis, bool)
+        # 100 - (10 + 1.5 * 5) = 82.5 hours = 82500 thousandths
+        self.assertEqual(millis, 82_500)
+
+    def test_half_hours_are_exact_at_the_integer_boundary(self):
+        """0.5 h is representable; the verdict must not hinge on float noise."""
+        half = {"futureWorkAvoidedHours": 0, "workAddedHours": 0,
+                "maintenanceDebtHours": 1}          # -1.5 h
+        self.assertEqual(gate.compute_net_millis(half), -1_500)
+        zero = {"futureWorkAvoidedHours": 0, "workAddedHours": 1,
+                "maintenanceDebtHours": 2}          # 0 - (1 + 3) = -4
+        self.assertEqual(gate.compute_net_millis(zero), -4_000)
+
+    def test_the_integer_net_agrees_with_the_float_one(self):
+        cases = [
+            {"futureWorkAvoidedHours": 120, "workAddedHours": 10,
+             "maintenanceDebtHours": 2},
+            {"futureWorkAvoidedHours": 1, "workAddedHours": 0,
+             "maintenanceDebtHours": 3},
+            {"futureWorkAvoidedHours": 0, "workAddedHours": 0,
+             "maintenanceDebtHours": 0},
+        ]
+        for net in cases:
+            with self.subTest(net=net):
+                self.assertAlmostEqual(gate.compute_net(net),
+                                       gate.compute_net_millis(net) / 1000,
+                                       places=9)
+
+    def test_odd_debt_floors_in_the_conservative_direction(self):
+        # 3/2 of an odd number of hours is a half hour; floor, never round up.
+        self.assertEqual(gate.compute_net_millis(
+            {"futureWorkAvoidedHours": 0, "workAddedHours": 0,
+             "maintenanceDebtHours": 3}), -4_500)
+        self.assertEqual(gate.compute_net_millis(
+            {"futureWorkAvoidedHours": 10, "workAddedHours": 0,
+             "maintenanceDebtHours": 1}), 8_500)
 
     def test_fail_net_negative_moving_rocks(self):
         invoice = build({"netUtility": {"futureWorkAvoidedHours": 0,

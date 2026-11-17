@@ -84,11 +84,18 @@ def parse_ratio(text: str) -> tuple[int, int]:
 
 
 def _net_utility_millis(gate_result: dict) -> Optional[int]:
-    """The gate's float hours, rendered as integer thousandths exactly once."""
+    """The gate's integer thousandths, taken as-is.
+
+    `gate` already computes this in integers (`compute_net_millis`); re-deriving
+    it from the float hours would put rounding back into a path that does not
+    need it. The float fallback only exists for a gate result from an older
+    caller that predates the field.
+    """
+    millis = gate_result.get("netUtilityMillis")
+    if isinstance(millis, int) and not isinstance(millis, bool):
+        return millis
     net = gate_result.get("netUtility")
-    if net is None:
-        return None
-    return round(net * 1000)
+    return None if net is None else round(net * 1000)
 
 
 def settle(

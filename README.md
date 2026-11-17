@@ -40,13 +40,13 @@ transfers anything.
 
 | File | Purpose |
 |------|---------|
-| `gate.py` | The CLI + gate logic, plus the reviewer-set model (`validate_reviewer_set`, `quorum_reached`) — stdlib only (`argparse`, `json`, `re`, `sys`; Python 3.11+) |
+| `gate.py` | The CLI + gate logic, plus the reviewer-set model (`validate_reviewer_set`, `quorum_reached`). Net utility is computed in integer thousandths; stdlib only (`argparse`, `json`, `re`, `sys`; Python 3.11+) |
 | `tally.py` | Off-chain tally / consensus service: counts distinct reviewer approvals, emits the mint-ready `mintFromConsensus` payload |
 | `settle.py` | End-to-end settlement: gate → tally → ledger, in that order. Refuses to produce a number the first two do not authorise |
 | `ledger.py` | Exact-rational ledger: compression savings, achieved ratio, per-recipient payouts, batch settlement — `fractions` only, no floats ever |
 | `invoice.schema.json` | Formal JSON Schema (draft-07) for the Foken Invoice |
 | `reviewers.json` | Example reviewer set (7 distinct `0x` addresses) |
-| `test_gate.py` | `unittest` suite for the gate (34 tests) |
+| `test_gate.py` | `unittest` suite for the gate (38 tests) |
 | `test_reviewers.py` | `unittest` suite for the reviewer-set model |
 | `test_tally.py` | `unittest` suite for the tally service |
 | `test_ledger.py` | `unittest` suite for the ledger (flooring, ratio, settlement) |
@@ -73,7 +73,7 @@ python3 tally.py --reviewers reviewers.json --votes votes.json \
 Output (default) is one JSON line:
 
 ```json
-{"invoiceId": "...", "verdict": "PASS", "reason": "...", "netUtility": 82.5}
+{"invoiceId": "...", "verdict": "PASS", "reason": "...", "netUtility": 82.5, "netUtilityMillis": 82500}
 ```
 
 Exit codes: **0 = PASS**, **1 = FAIL**, **2 = REVIEW**.
@@ -134,7 +134,19 @@ and the gated fields below; it does not recompute anything from a repo.
 those numbers **as already-computed inputs** — it does NOT inspect the repo
 or re-derive them. That computation is a separate tool (out of scope here).
 The gate only checks they are present and non-negative, then applies the
-formula.
+formula — in **integer thousandths of an hour**, never floats:
+
+```
+net = futureWorkAvoided·1000 − (workAdded·1000 + ⌊3·maintenanceDebt·1000 / 2⌋)
+```
+
+The 1.5× debt weight is the exact rational 3/2 rather than the float 1.5, so a
+half hour is representable and a verdict can never turn on float noise at
+exactly zero. `compute_net_millis` returns that integer; `compute_net` remains as
+the legacy float view (hours) for callers that only want to display it. Debt is
+charged floored, which can only make the net smaller — the conservative
+direction for a claim. `gate.evaluate` returns both `netUtility` (float, legacy)
+and `netUtilityMillis` (int, canonical); `settle.py` uses only the latter.
 
 ### Formal JSON Schema
 

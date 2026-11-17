@@ -38,7 +38,14 @@ HISTORY_N = 10  # number of history invoices used for the median deviation check
 MIN_REVIEWERS = 5  # minimum reviewer-set size (spec-mandated; overridable per call)
 SHA256_PREFIX = "sha256://"
 IP_ASSIGNMENT_PHRASE = "IRREVOCABLE ASSIGNMENT"
-MAINTENANCE_DEBT_WEIGHT = 1.5
+#: Maintenance debt is charged at 1.5x, as an exact rational (3/2) rather than
+#: the float 1.5, so the net can be computed in integer thousandths.
+DEBT_WEIGHT_NUM = 3
+DEBT_WEIGHT_DEN = 2
+#: Every hour is one thousand units: the money path stays integer end to end.
+HOURS_SCALE = 1000
+#: Kept for readability at call sites and for the human printout.
+MAINTENANCE_DEBT_WEIGHT = DEBT_WEIGHT_NUM / DEBT_WEIGHT_DEN
 
 HEX_SIGNATURE = re.compile(r"^0x[0-9a-fA-F]+$")
 HEX_ADDRESS = re.compile(r"^0x[0-9a-fA-F]{40}$")
@@ -168,12 +175,30 @@ def net_utility_review_reason(invoice: dict) -> Optional[str]:
 # Net-utility gate
 # --------------------------------------------------------------------------
 
-def compute_net(net_utility: dict) -> float:
-    """net = futureWorkAvoidedHours - (workAddedHours + 1.5 * maintenanceDebtHours)"""
+def compute_net_millis(net_utility: dict) -> int:
+    """The net, in integer thousandths of an hour.
+
+    ``net = futureWorkAvoided - (workAdded + 3/2 * maintenanceDebt)``
+
+    Integer all the way down: the weight is the exact rational 3/2, and a half
+    hour is representable at this scale, so a verdict is never the victim of
+    float rounding at exactly zero. Debt is charged floor(3/2 * md), which can
+    only ever make the net *smaller* — the conservative direction for a claim.
+    """
     fw = net_utility["futureWorkAvoidedHours"]
     wa = net_utility["workAddedHours"]
     md = net_utility["maintenanceDebtHours"]
-    return fw - (wa + MAINTENANCE_DEBT_WEIGHT * md)
+    return fw * HOURS_SCALE - (wa * HOURS_SCALE + md * DEBT_WEIGHT_NUM * HOURS_SCALE // DEBT_WEIGHT_DEN)
+
+
+def compute_net(net_utility: dict) -> float:
+    """``compute_net`` as hours, as a float — the legacy view.
+
+    Prefer `compute_net_millis` in any path that decides anything: this
+    conversion is the only float in the money, and it exists so that older
+    callers and the human printout keep working.
+    """
+    return compute_net_millis(net_utility) / HOURS_SCALE
 
 
 # --------------------------------------------------------------------------
@@ -329,8 +354,9 @@ def evaluate(invoice: Any, history: Optional[list] = None) -> dict:
         return {"invoiceId": invoice_id, "verdict": "REVIEW",
                 "reason": reason, "netUtility": None}
 
-    net = compute_net(invoice["netUtility"])
-    if net <= 0:
+    net_millis = compute_net_millis(invoice["netUtility"])
+    net = net_millis / HOURS_SCALE
+    if net_millis <= 0:
         return {"invoiceId": invoice_id, "verdict": "FAIL",
                 "reason": ("net-negative utility: future work avoided is "
                            "eclipsed by work added + maintenance debt"),
@@ -339,11 +365,12 @@ def evaluate(invoice: Any, history: Optional[list] = None) -> dict:
     reason = valuation_deviation_reason(invoice, history)
     if reason:
         return {"invoiceId": invoice_id, "verdict": "REVIEW",
-                "reason": reason, "netUtility": net}
+                "reason": reason, "netUtility": net, "netUtilityMillis": net_millis}
 
     return {"invoiceId": invoice_id, "verdict": "PASS",
             "reason": "net utility positive; eligible for human vote",
-            "netUtility": net}
+            "netUtility": net,
+            "netUtilityMillis": net_millis}
 
 
 # --------------------------------------------------------------------------
