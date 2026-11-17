@@ -42,6 +42,7 @@ transfers anything.
 |------|---------|
 | `gate.py` | The CLI + gate logic, plus the reviewer-set model (`validate_reviewer_set`, `quorum_reached`) — stdlib only (`argparse`, `json`, `re`, `sys`; Python 3.11+) |
 | `tally.py` | Off-chain tally / consensus service: counts distinct reviewer approvals, emits the mint-ready `mintFromConsensus` payload |
+| `settle.py` | End-to-end settlement: gate → tally → ledger, in that order. Refuses to produce a number the first two do not authorise |
 | `ledger.py` | Exact-rational ledger: compression savings, achieved ratio, per-recipient payouts, batch settlement — `fractions` only, no floats ever |
 | `invoice.schema.json` | Formal JSON Schema (draft-07) for the Foken Invoice |
 | `reviewers.json` | Example reviewer set (7 distinct `0x` addresses) |
@@ -49,6 +50,7 @@ transfers anything.
 | `test_reviewers.py` | `unittest` suite for the reviewer-set model |
 | `test_tally.py` | `unittest` suite for the tally service |
 | `test_ledger.py` | `unittest` suite for the ledger (flooring, ratio, settlement) |
+| `test_settle.py` | `unittest` suite for the end-to-end path (live pair, refusals, exit codes) |
 | `test_schema.py` | `unittest` suite for the JSON Schema (incl. a stdlib-only validator) |
 | `pyproject.toml` | Minimal project metadata so `uv run` works in this dir |
 
@@ -280,6 +282,33 @@ Behavior:
 
 ---
 
+## End-to-end settlement (`settle.py`)
+
+```bash
+python3 settle.py live_omni_invoice.json \
+  --votes live_votes.json --reviewers reviewers.json --human
+```
+
+```
+invoice  01933b70-9831-7bc8-8123-018b1509a001
+verdict  PASS (round 1, 5/7 approved)
+claimed  400 FKN
+kept     flat assessment
+verified 400 FKN
+  pay    0x71C8364f3B8844892cfa7D2Fa9f430589aCEE940  400
+total    400 FKN
+```
+
+The order is the point: **gate, then tally, then ledger.** A popular bad invoice
+cannot buy consensus with a crowd, and a refused claim returns no number at all
+rather than a zero that looks like a quote. `--kept N/D` turns a flat assessment
+into a compression claim, and the payable amount becomes the tokens actually
+removed (floored) — `--kept 3/10` on the same invoice settles at `280`.
+
+Exit codes: `0` settled, `1` refused (gate or quorum said no), `2` bad input
+(unreadable JSON, unusable ratio) — the distinction tells you whether to fix the
+claim or argue with the reviewers.
+
 ## Exact-rational ledger (`ledger.py`)
 
 The gate prices, the tally counts, the ledger does the arithmetic — with
@@ -351,6 +380,12 @@ Test suites:
   than a 0% claim, a ratio above 1 is rejected, floats and `bool` are refused,
   ratios stay `Fraction`s (`3/10`, not `30.0%`), payouts use the verified
   amount, and settlement sums duplicate recipients deterministically.
+- `test_settle.py` — 16 tests: the **recorded live pair** (`live_omni_invoice.json`
+  + `live_votes.json`) settles to exactly `400` (PASS, 5 of 7 approved, quorum 4),
+  the total always equals the sum of its entries, a compression claim pays only
+  what was removed, a net-negative invoice never reaches the ledger, three
+  approvals refuse where four settle, an outsider vote refuses, and the three
+  exit codes mean settled / refused / bad-input.
 - `test_schema.py` — schema/draft-07 structural checks against `gate.py`'s
   constants, plus a stdlib-only draft-07-subset validator over valid and
   invalid invoices.
