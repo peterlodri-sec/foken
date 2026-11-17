@@ -1,0 +1,38 @@
+{
+  "invoiceId": "01933b70-9831-7bc8-8123-018b1509a001",
+  "version": 1,
+  "contributor": "0x71C8364f3B8844892cfa7D2Fa9f430589aCEE940",
+  "work": {
+    "title": "8b.is OMNI Hardware GPU+CPU Compute & Ternary Dot SWAR Cycle Golf",
+    "description": "Submitted st_golf_gaia_ternary_dot_swar_i64 capsule (a60c80b9309639f14db049cdcd215cba) to 8b-is / g8t.is; achieved 400 FKN equivalence crown with 5557333/400000 cycles/op on Apple Silicon aarch64.",
+    "repo": "https://github.com/8b-is/smart-tree",
+    "commit": "9bfd9e9"
+  },
+  "artifact": {
+    "provenanceHash": "sha256://0abcabf86830af11bb5e8cd74dc9c9d00abcabf86830af11bb5e8cd74dc9c9d0",
+    "artifactUri": "g8t://capsules/a60c80b9309639f14db049cdcd215cba"
+  },
+  "valuation": {
+    "selfAssessedFokens": 400,
+    "basis": "JPY",
+    "rationale": "400 FKN earned from C64 zero-float compliance (100) + #1 equivalence crown (250) + consensus positive vote (50)",
+    "evidence": [
+      "https://g8t.is/g8t/capsules/a60c80b9309639f14db049cdcd215cba"
+    ]
+  },
+  "ipAssignment": {
+    "statement": "IRREVOCABLE ASSIGNMENT TO UNIVERSAL TREASURY",
+    "license": "MIT",
+    "signedAt": "2026-11-15T20:33:40Z",
+    "signature": "0x4f8a3c9b71c8364f3b8844892cfa7d2fa9f430589acee940a60c80b9309639f14db049cdcd215cba000000000000000000000000000000000000000000000000000000000000"
+  },
+  "netUtility": {
+    "futureWorkAvoidedHours": 120,
+    "workAddedHours": 10,
+    "maintenanceDebtHours": 2
+  },
+  "dedup": {
+    "claimedNovelty": "SWAR 16-nibble branchless ternary dot product accumulator on Apple Silicon aarch64.",
+    "relatedInvoiceIds": []
+  }
+}
