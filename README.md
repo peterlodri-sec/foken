@@ -42,11 +42,13 @@ transfers anything.
 |------|---------|
 | `gate.py` | The CLI + gate logic, plus the reviewer-set model (`validate_reviewer_set`, `quorum_reached`) — stdlib only (`argparse`, `json`, `re`, `sys`; Python 3.11+) |
 | `tally.py` | Off-chain tally / consensus service: counts distinct reviewer approvals, emits the mint-ready `mintFromConsensus` payload |
+| `ledger.py` | Exact-rational ledger: compression savings, achieved ratio, per-recipient payouts, batch settlement — `fractions` only, no floats ever |
 | `invoice.schema.json` | Formal JSON Schema (draft-07) for the Foken Invoice |
 | `reviewers.json` | Example reviewer set (7 distinct `0x` addresses) |
 | `test_gate.py` | `unittest` suite for the gate (34 tests) |
 | `test_reviewers.py` | `unittest` suite for the reviewer-set model |
 | `test_tally.py` | `unittest` suite for the tally service |
+| `test_ledger.py` | `unittest` suite for the ledger (flooring, ratio, settlement) |
 | `test_schema.py` | `unittest` suite for the JSON Schema (incl. a stdlib-only validator) |
 | `pyproject.toml` | Minimal project metadata so `uv run` works in this dir |
 
@@ -278,6 +280,34 @@ Behavior:
 
 ---
 
+## Exact-rational ledger (`ledger.py`)
+
+The gate prices, the tally counts, the ledger does the arithmetic — with
+`fractions` and nothing else. A saving is a claim about tokens that were
+removed, so it is computed from the fraction that *survives*:
+
+```python
+import ledger
+
+ledger.compression_savings(1000, 3, 10)   # 700: 30% kept, 70% saved
+ledger.compression_savings(10, 1, 3)      # 7: floored, never rounded up
+ledger.compression_ratio(1000, 300)       # Fraction(3, 10) - a claim, not a percentage
+
+entry = ledger.LedgerEntry("alice", claimed_tokens=1000, verified_tokens=700)
+entry.fokens                              # 700: payouts use the verified amount
+ledger.settle([entry])                    # {'payouts': {'alice': 700}, 'totalFokens': 700, ...}
+```
+
+Three rules, all enforced rather than documented:
+
+- **Floor, never round up.** `original - floor(original * kept)` can only
+  understate a saving. A collections ledger may be wrong in that direction and
+  no other.
+- **`denominator == 0` raises.** A zero ratio is a malformed claim, not a 0%
+  saving — the difference matters when the number becomes a payout.
+- **No floats, no `bool`.** `compression_savings(100, 0.5, 1)` is an error, not
+  a rounding surprise; `True` is not the integer `1`.
+
 ## Pending owner params (not hardcoded)
 
 The following are owner decisions that are deliberately **not** baked in;
@@ -316,6 +346,11 @@ Test suites:
 - `test_tally.py` — the k formula (and its identity with the quorum
   threshold), payload shape/values, strict-vote handling, dedup, review
   round / min-approvals overrides, and CLI exit codes 0/1/2.
+- `test_ledger.py` — 10 tests: savings are exact and floored (`10` at `1/3`
+  retained saves `7`, never `6` or `8`), a zero denominator is an error rather
+  than a 0% claim, a ratio above 1 is rejected, floats and `bool` are refused,
+  ratios stay `Fraction`s (`3/10`, not `30.0%`), payouts use the verified
+  amount, and settlement sums duplicate recipients deterministically.
 - `test_schema.py` — schema/draft-07 structural checks against `gate.py`'s
   constants, plus a stdlib-only draft-07-subset validator over valid and
   invalid invoices.
