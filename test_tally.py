@@ -67,9 +67,33 @@ class TestConsensus(unittest.TestCase):
 
     def test_review_round_passthrough(self):
         reviewers = reviewer_set(7)
-        payload = tally.consensus(votes_for(reviewers[:4]), reviewers,
+        # Round 2 asks for ceil(2n/3) = 5 of 7, not the round-1 floor(n/2)+1 = 4.
+        payload = tally.consensus(votes_for(reviewers[:5]), reviewers,
                                   review_round=2)
         self.assertEqual(payload["reviewRound"], 2)
+        self.assertEqual(payload["approvalCount"], 5)
+
+    def test_review_round_raises_the_bar(self):
+        """A REVIEW verdict is the claim that should need a wider mandate."""
+        reviewers = reviewer_set(7)
+        four = votes_for(reviewers[:4])
+        tally.consensus(four, reviewers)                       # round 1: 4 of 7 ok
+        with self.assertRaises(ValueError):
+            tally.consensus(four, reviewers, review_round=2)   # round 2: needs 5
+
+    def test_review_quorum_is_two_thirds_rounded_up(self):
+        for n in range(5, 13):
+            with self.subTest(n=n):
+                first = tally.required_approvals(n, 1)
+                second = tally.required_approvals(n, 2)
+                self.assertEqual(first, n // 2 + 1)
+                self.assertEqual(second, (2 * n + 2) // 3)
+                self.assertGreaterEqual(second, first)
+                self.assertLessEqual(second, n)
+
+    def test_review_round_zero_is_rejected(self):
+        with self.assertRaises(ValueError):
+            tally.required_approvals(5, 0)
 
     def test_insufficient_approvals_raises(self):
         reviewers = reviewer_set(5)
@@ -232,10 +256,17 @@ class TestTallyCLI(unittest.TestCase):
         self.assertIn("consensus not reached", result["reason"])
 
     def test_cli_review_round_flag(self):
-        proc = run_tally(reviewer_set(5), votes_for(reviewer_set(5)[:3]),
-                         "--review-round", "2")
-        self.assertEqual(proc.returncode, 0)
-        self.assertEqual(json.loads(proc.stdout)["reviewRound"], 2)
+        # Round 2 needs ceil(2*5/3) = 4 of 5; three is a refusal, four settles.
+        reviewers = reviewer_set(5)
+        refused = run_tally(reviewers, votes_for(reviewers[:3]),
+                            "--review-round", "2")
+        self.assertEqual(refused.returncode, 1)
+        # A refusal is an error object, not a payload: no reviewRound to echo.
+        self.assertFalse(json.loads(refused.stdout)["consensus"])
+        ok = run_tally(reviewers, votes_for(reviewers[:4]),
+                       "--review-round", "2")
+        self.assertEqual(ok.returncode, 0)
+        self.assertEqual(json.loads(ok.stdout)["reviewRound"], 2)
 
     def test_cli_min_approvals_override(self):
         proc = run_tally(reviewer_set(5), votes_for(reviewer_set(5)[:2]),

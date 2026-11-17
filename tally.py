@@ -32,13 +32,24 @@ from typing import Any, Optional
 import gate
 
 
-def required_approvals(set_size: int) -> int:
-    """k = floor(n/2) + 1 — the strict-majority quorum from the spec.
+def required_approvals(set_size: int, review_round: int = 1) -> int:
+    """The approval quorum for a round.
 
-    For odd n this is (n+1)/2; for even n it is the smallest count that also
-    satisfies gate.quorum_reached (approvals * 2 > n).
+    Round 1 (a PASS verdict): ``k = floor(n/2) + 1`` — the strict majority from
+    the spec. For odd n this is (n+1)/2; for even n it is the smallest count
+    that also satisfies gate.quorum_reached (approvals * 2 > n).
+
+    Round 2 (a REVIEW verdict: valuation deviated past 2x the median, or
+    netUtility was malformed and a human fixed it): ``k = ceil(2n/3)``. A claim
+    that already tripped the advisory check is exactly the claim that should
+    need a wider mandate, so the second round raises the bar instead of
+    relabelling the first one.
     """
-    return set_size // 2 + 1
+    if review_round < 1:
+        raise ValueError("review_round must be >= 1")
+    if review_round == 1:
+        return set_size // 2 + 1
+    return (2 * set_size + 2) // 3
 
 
 def _read_json(path: str) -> Any:
@@ -78,9 +89,11 @@ def consensus(votes: Any, reviewers: Any, review_round: int = 1,
     reviewers:  reviewer set — a list of >= 5 distinct 0x addresses (the
                 unwrapped form; gate.load_reviewers produces it from a file).
     review_round: 1 for a normal vote, 2 when the gate verdict was REVIEW
-                (extra review round). Passed through to the payload.
-    min_approvals: required distinct approvals; default k = floor(n/2) + 1
-                where n = reviewer set size (owner param, not hardcoded).
+                (extra review round). Passed through to the payload, and it
+                raises the quorum: floor(n/2)+1 in round 1, ceil(2n/3) in
+                round 2 -- see `required_approvals`.
+    min_approvals: required distinct approvals; default is the round's quorum
+                from `required_approvals` (owner param, not hardcoded).
 
     Strict by design: any malformed vote (bad address, non-member reviewer,
     bad signature, malformed invoice) raises ValueError — the tally never
@@ -131,7 +144,8 @@ def consensus(votes: Any, reviewers: Any, review_round: int = 1,
         raise ValueError("votes reference different invoices: "
                          + ", ".join(sorted(invoice_ids)))
 
-    k = required_approvals(set_size) if min_approvals is None else min_approvals
+    k = (required_approvals(set_size, review_round)
+         if min_approvals is None else min_approvals)
     if not (isinstance(k, int) and not isinstance(k, bool) and k >= 1):
         raise ValueError("min_approvals must be a positive integer")
     if k > set_size:

@@ -244,6 +244,24 @@ The spec's **k = floor(n/2) + 1** distinct approvals is exactly the smallest
 count that satisfies the >50% rule (for n = 5: k = 3; n = 6: k = 4;
 n = 7: k = 4), so `tally.py` uses the same threshold.
 
+### The second round asks for more
+
+A `REVIEW` verdict means the claim already tripped an advisory check — the
+valuation deviated past 2× the median, or `netUtility` was malformed and a human
+supplied it. That is precisely the claim that should need a wider mandate, so
+`review_round=2` raises the bar to **⌈2n/3⌉** instead of relabelling round 1:
+
+| reviewer set | round 1 (PASS) | round 2 (REVIEW) |
+|---:|---:|---:|
+| 5 | 3 | 4 |
+| 6 | 4 | 4 |
+| 7 | 4 | 5 |
+| 8 | 5 | 6 |
+
+`--min-approvals` still overrides both. The live pair in `live_votes.json` has
+five approvals from a seven-address set, so it settles in round 2 at 5 of 7 and
+refuses at 4 of 7 — while the same four votes settle in round 1.
+
 ## Off-chain tally (`tally.py`)
 
 After the gate pre-filters an invoice and the human vote collects approvals,

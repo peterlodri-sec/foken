@@ -101,6 +101,47 @@ class TestLiveSettlement(unittest.TestCase):
         self.assertIsInstance(again["totalFokens"], int)
 
 
+class TestReviewRound(unittest.TestCase):
+    """A REVIEW verdict is the claim that should need the wider mandate."""
+
+    @staticmethod
+    def history_at(median_fokens):
+        """Ten chronological invoices whose median valuation is the argument."""
+        return [{"valuation": {"selfAssessedFokens": median_fokens}} for _ in range(10)]
+
+    def setUp(self):
+        self.invoice = load(LIVE_INVOICE)          # selfAssessedFokens 400
+        self.votes = load(LIVE_VOTES)              # 5 distinct approvals
+        self.reviewers = gate.load_reviewers(REVIEWERS)   # 7 reviewers
+
+    def test_a_deviating_valuation_lands_in_review(self):
+        result = gate.evaluate(self.invoice, self.history_at(100))
+        self.assertEqual(result["verdict"], "REVIEW")
+        self.assertIn("deviates >2x median", result["reason"])
+
+    def test_review_round_needs_five_of_seven_and_the_live_pair_has_five(self):
+        report = settle.settle(self.invoice, self.votes, self.reviewers,
+                               history=self.history_at(100))
+        self.assertEqual(report["verdict"], "REVIEW")
+        self.assertEqual(report["reviewRound"], 2)
+        self.assertEqual(report["approvalCount"], 5)
+        self.assertEqual(report["totalFokens"], 400)
+
+    def test_review_round_refuses_at_four_of_seven(self):
+        with self.assertRaises(settle.Refused) as ctx:
+            settle.settle(self.invoice, self.votes[:4], self.reviewers,
+                          history=self.history_at(100))
+        self.assertIn("tally", str(ctx.exception))
+
+    def test_the_same_four_votes_settle_in_round_one(self):
+        # Control: identical votes, but a non-deviating history.
+        report = settle.settle(self.invoice, self.votes[:4], self.reviewers,
+                               history=self.history_at(400))
+        self.assertEqual(report["verdict"], "PASS")
+        self.assertEqual(report["reviewRound"], 1)
+        self.assertEqual(report["approvalCount"], 4)
+
+
 class TestRefusals(unittest.TestCase):
     def setUp(self):
         self.invoice = load(LIVE_INVOICE)
